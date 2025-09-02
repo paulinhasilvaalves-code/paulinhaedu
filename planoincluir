@@ -1,0 +1,251 @@
+import { useState } from 'react';
+
+// O componente principal da aplicação
+export default function App() {
+  // Estado para armazenar os dados do formulário
+  const [studentData, setStudentData] = useState({
+    nome: '',
+    idade: '',
+    ano: '',
+    disciplina: '',
+    dificuldades: '',
+    objetivos: ''
+  });
+
+  // Estado para armazenar o PEI gerado e o status de carregamento
+  const [peiContent, setPeiContent] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // A função para lidar com as mudanças nos campos do formulário
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setStudentData(prevData => ({
+      ...prevData,
+      [name]: value
+    }));
+  };
+
+  // A função para construir o prompt para a API do Gemini
+  const buildPrompt = () => {
+    return `
+      Você é um especialista em Educação Inclusiva e Atendimento Educacional Especializado (AEE). Sua tarefa é elaborar um Plano Educacional Individualizado (PEI) detalhado para um aluno, com base nas informações fornecidas. Use uma linguagem profissional, clara e estruturada.
+
+      **Dados do aluno:**
+      - Nome: ${studentData.nome}
+      - Idade: ${studentData.idade}
+      - Ano/Série: ${studentData.ano}
+      - Disciplina(s): ${studentData.disciplina}
+      - Necessidades/dificuldades observadas: ${studentData.dificuldades}
+      - Objetivos de aprendizagem desejados: ${studentData.objetivos}
+
+      **Instruções para a elaboração do PEI:**
+
+      1.  **Perfil de Aprendizagem do Aluno:** Descreva um breve perfil de aprendizagem, com base nas necessidades observadas.
+      2.  **Objetivos de Ensino:** Liste de 3 a 5 objetivos de ensino claros e práticos. Cada objetivo deve ser avaliável, relevante para o desenvolvimento do aluno e ter um prazo definido.
+      3.  **Estratégias Pedagógicas Inclusivas:** Sugira estratégias de ensino práticas e inclusivas, considerando as necessidades e dificuldades do aluno.
+      4.  **Recursos Pedagógicos e de Acessibilidade:** Indique recursos adequados que possam auxiliar no processo de ensino-aprendizagem.
+      5.  **Formas de Avaliação Adaptada:** Proponha métodos de avaliação que sejam justos e que considerem o progresso individual do aluno.
+
+      Formate a resposta utilizando títulos em negrito para cada seção e tópicos em lista, como em um documento oficial de PEI.
+    `;
+  };
+
+  // A função para chamar a API do Gemini para gerar o PEI
+  const generatePEI = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    const chatHistory = [{ role: "user", parts: [{ text: buildPrompt() }] }];
+    const payload = { contents: chatHistory };
+    const apiKey = ""; // Deixe a chave da API como uma string vazia
+
+    try {
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro na resposta da API. Tente novamente mais tarde.');
+      }
+
+      const result = await response.json();
+      const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (text) {
+        setPeiContent(text);
+      } else {
+        setError('Não foi possível gerar o PEI. A resposta da API está vazia ou mal formatada.');
+      }
+
+    } catch (err) {
+      console.error("Erro ao gerar o PEI:", err);
+      setError('Ocorreu um erro. Por favor, verifique sua conexão ou tente novamente.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Funções para lidar com a cópia e download do conteúdo
+  const copyToClipboard = () => {
+    if (peiContent) {
+      // Cria um elemento temporário para copiar o texto
+      const el = document.createElement('textarea');
+      el.value = peiContent;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      alert('Conteúdo copiado para a área de transferência!');
+    }
+  };
+
+  const downloadPEI = () => {
+    if (peiContent) {
+      const element = document.createElement("a");
+      const file = new Blob([peiContent], {type: 'text/plain'});
+      element.href = URL.createObjectURL(file);
+      const fileName = `PEI_${studentData.nome.replace(/\s/g, '_')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.txt`;
+      element.download = fileName;
+      document.body.appendChild(element); // Necessário para Firefox
+      element.click();
+      document.body.removeChild(element); // Limpeza
+    }
+  };
+
+  // O JSX para renderizar a interface do usuário
+  return (
+    <div className="flex flex-col items-center justify-center p-6 bg-slate-50 min-h-screen">
+      <div className="w-full max-w-4xl p-8 bg-white shadow-xl rounded-2xl">
+        <h1 className="text-3xl sm:text-4xl font-bold text-center text-slate-800 mb-8 font-serif">
+          Plano Educacional Individualizado (PEI)
+        </h1>
+        <form onSubmit={generatePEI} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex flex-col">
+              <label htmlFor="nome" className="mb-2 text-sm font-medium text-slate-600">Nome do Aluno</label>
+              <input
+                type="text"
+                id="nome"
+                name="nome"
+                value={studentData.nome}
+                onChange={handleChange}
+                className="p-3 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
+                required
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="idade" className="mb-2 text-sm font-medium text-slate-600">Idade</label>
+              <input
+                type="number"
+                id="idade"
+                name="idade"
+                value={studentData.idade}
+                onChange={handleChange}
+                className="p-3 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
+                required
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="ano" className="mb-2 text-sm font-medium text-slate-600">Ano/Série</label>
+              <input
+                type="text"
+                id="ano"
+                name="ano"
+                value={studentData.ano}
+                onChange={handleChange}
+                className="p-3 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
+                required
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="disciplina" className="mb-2 text-sm font-medium text-slate-600">Disciplina(s)</label>
+              <input
+                type="text"
+                id="disciplina"
+                name="disciplina"
+                value={studentData.disciplina}
+                onChange={handleChange}
+                className="p-3 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
+                required
+              />
+            </div>
+          </div>
+          <div className="flex flex-col">
+            <label htmlFor="dificuldades" className="mb-2 text-sm font-medium text-slate-600">
+              Necessidades/Dificuldades Observadas (Descreva o máximo de detalhes possível)
+            </label>
+            <textarea
+              id="dificuldades"
+              name="dificuldades"
+              rows="4"
+              value={studentData.dificuldades}
+              onChange={handleChange}
+              className="p-3 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
+              required
+            ></textarea>
+          </div>
+          <div className="flex flex-col">
+            <label htmlFor="objetivos" className="mb-2 text-sm font-medium text-slate-600">
+              Objetivos de Aprendizagem Desejados (O que você gostaria que o aluno alcançasse?)
+            </label>
+            <textarea
+              id="objetivos"
+              name="objetivos"
+              rows="4"
+              value={studentData.objetivos}
+              onChange={handleChange}
+              className="p-3 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
+              required
+            ></textarea>
+          </div>
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-3 px-6 bg-sky-600 text-white font-semibold rounded-md shadow-md hover:bg-sky-700 transition-colors duration-200 disabled:bg-sky-300 focus:outline-none focus:ring-4 focus:ring-sky-500 focus:ring-opacity-50"
+          >
+            {isLoading ? 'Gerando PEI...' : 'Gerar PEI'}
+          </button>
+        </form>
+
+        {/* Seção para exibir o resultado ou o erro */}
+        <div className="mt-8 p-6 bg-slate-100 rounded-xl shadow-inner">
+          {error && (
+            <div className="p-4 bg-red-100 text-red-700 rounded-md text-sm">
+              <p>Ocorreu um erro: {error}</p>
+            </div>
+          )}
+          {peiContent ? (
+            <div>
+              <h2 className="text-2xl font-bold text-sky-800 mb-4 text-center">PEI Gerado</h2>
+              <div
+                className="prose max-w-none text-slate-700 leading-relaxed space-y-4"
+                dangerouslySetInnerHTML={{ __html: peiContent.replace(/\*\*(.*?)\*\*/g, '<h3>$1</h3>').replace(/\n/g, '<br/>') }}
+              />
+              <div className="flex justify-center gap-4 mt-6">
+                <button
+                  onClick={copyToClipboard}
+                  className="py-2 px-4 bg-slate-500 text-white font-semibold rounded-md shadow-md hover:bg-slate-600 transition-colors duration-200"
+                >
+                  Copiar Texto
+                </button>
+                <button
+                  onClick={downloadPEI}
+                  className="py-2 px-4 bg-green-500 text-white font-semibold rounded-md shadow-md hover:bg-green-600 transition-colors duration-200"
+                >
+                  Baixar PEI
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-center text-slate-500 italic">Preencha o formulário acima e clique em "Gerar PEI" para começar.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
