@@ -59,7 +59,7 @@ export default function App() {
 
     const chatHistory = [{ role: "user", parts: [{ text: buildPrompt() }] }];
     const payload = { contents: chatHistory };
-    const apiKey = import.meta.env.VITE_API_KEY || process.env.REACT_APP_API_KEY || "AIzaSyDq3R7bd3jIcLcgf9lnSKo6KlOng9uEuEc";
+    const apiKey = "AIzaSyDq3R7bd3jIcLcgf9lnSKo6KlOng9uEuEc";
 
     try {
       const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
